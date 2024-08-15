@@ -42,11 +42,15 @@ export default class MyPlugin extends Plugin {
           baseUrl: metadata?.quartzBaseUrl || ''
         }
         const sedString = Object.entries(replacements)
+          // You'll notice the sed match is all characters until the end of the line.
+          // This will screw you up if your config file has multiple variables on the same line
+          // or if it's all just a single line :P
           .map(([key, value]) => `s/${key}:.*/${key}: "${
             // Replace single quotes with the hex code so that they don't terminate the sed command
             value.replace(/['"]/g, '\\x27')
           }",/`).join('; ')
         await new Promise<void>((resolve) => {
+          // Use sed to modify the quartz.config.ts to update it with the new data
           exec(`sed -i '${sedString}' ${this.settings.quartzPath}/quartz.config.ts`, (_error, _stdout, stderr) => {
             if (stderr) console.log(stderr)
             resolve()
