@@ -1,6 +1,11 @@
-import { Plugin, TFile } from 'obsidian'
+import { Notice, Plugin, TFile } from 'obsidian'
 import { DEFAULT_SETTINGS, MyPluginSettings, MySettingTab } from './settings'
 import { exec } from 'child_process'
+
+const STATIC_FILES = [
+  'icon.png',
+  'og-image.png'
+]
 
 export default class MyPlugin extends Plugin {
   settings: MyPluginSettings
@@ -22,11 +27,13 @@ export default class MyPlugin extends Plugin {
         const metadata = this.app.metadataCache.getFileCache(file)?.frontmatter
         const vaultFolder = file.parent?.path || ''
         const inputFolder = this.app.vault.adapter.getFullPath(vaultFolder)
-        const outputFolder = metadata?.quartzPublishFolder
+        const outputFolder = metadata?.quartzPublishFolder.replace(/\/$/, '')
         if (!outputFolder) {
           console.log(`This doesn't appear to be a Quartz publish root folder`)
           return
         }
+
+        const notice = new Notice('Publishing folder...', 10000)
 
         // Loop through all files which will be uploaded, and modify their frontmatter (if needed).
         // I'm sure there's a much more "correct" way to find these files - let me know if you know.
@@ -44,28 +51,29 @@ export default class MyPlugin extends Plugin {
         const sedString = Object.entries(replacements)
           // You'll notice the sed match is all characters until the end of the line.
           // This will screw you up if your config file has multiple variables on the same line
-          // or if it's all just a single line :P
+          // or if it's all just a single line. So uhh don't do that.
           .map(([key, value]) => `s/${key}:.*/${key}: "${
             // Replace single quotes with the hex code so that they don't terminate the sed command
             value.replace(/['"]/g, '\\x27')
           }",/`).join('; ')
-        await new Promise<void>((resolve) => {
-          // Use sed to modify the quartz.config.ts to update it with the new data
-          exec(`sed -i '${sedString}' ${this.settings.quartzPath}/quartz.config.ts`, (_error, _stdout, stderr) => {
-            if (stderr) console.log(stderr)
-            resolve()
-          })
-        })
+        await this.exec(`sed -i '${sedString}' "${this.settings.quartzPath}/quartz.config.ts"`)
 
         // Execute the Quartz publish command
-        exec(`npx quartz build --directory "${inputFolder}" --output "${outputFolder}"`, {
+        await this.exec(`npx quartz build --directory "${inputFolder}" --output "${outputFolder}"`, {
           cwd: this.settings.quartzPath,
           shell: '/bin/bash',
           env: { PATH: this.settings.envPath }
-        }, (_error, stdout, stderr) => {
-          if (stderr) console.log(stderr)
-          if (stdout) console.log(stdout)
         })
+
+        // Copy the static assets (favicon, etc) to the output folder
+        for (const file of STATIC_FILES) {
+          const filePath = `${inputFolder}/${file}`
+          if (await this.exec(`test -f "${filePath}"`)) {
+            await this.exec(`cp "${filePath}" "${outputFolder}/static/"`)
+          }
+        }
+
+        notice.hide()
       }
     })
   }
@@ -81,6 +89,23 @@ export default class MyPlugin extends Plugin {
         // Set the title from the H1
         frontmatter.title = match[1]
       }
+    })
+  }
+
+  /**
+   * Wrap the child_process.exec command in a promise and return a boolean
+   */
+  async exec (command: string, options = {}) {
+    return new Promise<boolean>((resolve) => {
+      exec(command, options, (error, stdout, stderr) => {
+        if (error) {
+          console.log(stderr)
+          resolve(false)
+        } else {
+          if (stdout) console.log(stdout)
+          resolve(true)
+        }
+      })
     })
   }
 
