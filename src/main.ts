@@ -16,10 +16,10 @@ export default class MyPlugin extends Plugin {
         const file = this.app.workspace.getActiveFile()
         if (!file) return
 
-        const metadata = this.app.metadataCache.getFileCache(file)
+        const metadata = this.app.metadataCache.getFileCache(file)?.frontmatter
         const vaultFolder = file.parent?.path || ''
         const inputFolder = this.app.vault.adapter.getFullPath(vaultFolder)
-        const outputFolder = metadata?.frontmatter?.quartzPublishFolder
+        const outputFolder = metadata?.quartzPublishFolder
         if (!outputFolder) {
           console.log(`This doesn't appear to be a Quartz publish root folder`)
           return
@@ -32,6 +32,25 @@ export default class MyPlugin extends Plugin {
           // Update the frontmatter fields
           await this.updateFrontmatterFields(uploadFile)
         }
+
+        // Modify Quartz config before publishing
+        const replacements = {
+          pageTitle: metadata?.quartzSiteTitle || '',
+          baseUrl: metadata?.quartzBaseUrl || ''
+        }
+        const sed = Object.entries(replacements)
+          .map(([key, value]) => `s/${key}:.*/${key}: "${
+            // Replace single quotes with the hex code so that they don't terminate the sed command
+            value.replace(/['"]/g, '\\x27')
+          }",/`)
+          .join('; ')
+
+        await new Promise<void>((resolve) => {
+          exec(`sed -i '${sed}' ${this.settings.quartzPath}/quartz.config.ts`, (_error, _stdout, stderr) => {
+            if (stderr) console.log(stderr)
+            resolve()
+          })
+        })
 
         // Execute the Quartz publish command
         exec(`npx quartz build --directory "${inputFolder}" --output "${outputFolder}"`, {
