@@ -25,7 +25,7 @@ export class MySettingTab extends PluginSettingTab {
     containerEl.empty()
 
     new Setting(containerEl)
-      .setName('Path to Quartz')
+      .setName('Path to your Quartz install')
       // .setDesc('')
       .addText(text => text
         .setPlaceholder('/home/user/dev/quartz')
@@ -36,8 +36,8 @@ export class MySettingTab extends PluginSettingTab {
         }))
 
     new Setting(containerEl)
-      .setName('PATH env variable')
-      .setDesc('Add colon-separate paths to your npx and node executables.')
+      .setName('NPX and NodeJS path(s)')
+      .setDesc('Add the paths to your npx and node executables, in your PATH environment variable format.')
       .addText(text => text
         .setPlaceholder('/usr/bin')
         .setValue(this.plugin.settings.envPath)

@@ -8,6 +8,9 @@ export default class MyPlugin extends Plugin {
   async onload () {
     await this.loadSettings()
 
+    // This adds a settings tab so the user can configure various aspects of the plugin
+    this.addSettingTab(new MySettingTab(this.app, this))
+
     // This adds a simple command that can be triggered anywhere
     this.addCommand({
       id: 'publish',
@@ -38,15 +41,13 @@ export default class MyPlugin extends Plugin {
           pageTitle: metadata?.quartzSiteTitle || '',
           baseUrl: metadata?.quartzBaseUrl || ''
         }
-        const sed = Object.entries(replacements)
+        const sedString = Object.entries(replacements)
           .map(([key, value]) => `s/${key}:.*/${key}: "${
             // Replace single quotes with the hex code so that they don't terminate the sed command
             value.replace(/['"]/g, '\\x27')
-          }",/`)
-          .join('; ')
-
+          }",/`).join('; ')
         await new Promise<void>((resolve) => {
-          exec(`sed -i '${sed}' ${this.settings.quartzPath}/quartz.config.ts`, (_error, _stdout, stderr) => {
+          exec(`sed -i '${sedString}' ${this.settings.quartzPath}/quartz.config.ts`, (_error, _stdout, stderr) => {
             if (stderr) console.log(stderr)
             resolve()
           })
@@ -56,30 +57,25 @@ export default class MyPlugin extends Plugin {
         exec(`npx quartz build --directory "${inputFolder}" --output "${outputFolder}"`, {
           cwd: this.settings.quartzPath,
           shell: '/bin/bash',
-          env: {
-            PATH: this.settings.envPath
-          }
+          env: { PATH: this.settings.envPath }
         }, (_error, stdout, stderr) => {
           if (stderr) console.log(stderr)
           if (stdout) console.log(stdout)
         })
       }
     })
-
-    // This adds a settings tab so the user can configure various aspects of the plugin
-    this.addSettingTab(new MySettingTab(this.app, this))
   }
 
   async updateFrontmatterFields (file: TFile) {
-    let contents = await this.app.vault.read(file)
-    // Strip the frontmatter (if any)
-    contents = contents.replace(/^---\r?\n(.*?)\n---\r?\n/s, '')
+    const contents = await this.app.vault.read(file)
+    // Strip the frontmatter from the note body
+    const body = contents.replace(/^---\r?\n(.*?)\n---\r?\n/s, '')
     await this.app.fileManager.processFrontMatter(file, frontmatter => {
       // Find the first H1
-      const match = contents.match(/^# (.+)$/m)
-      if (match?.[1]) {
+      const match = body.match(/^# (.+)$/m)
+      if (match?.[1] && frontmatter.title !== match[1]) {
         // Set the title from the H1
-        frontmatter.title = match?.[1]
+        frontmatter.title = match[1]
       }
     })
   }
