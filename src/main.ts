@@ -59,7 +59,7 @@ export default class MyPlugin extends Plugin {
         await this.exec(`sed -i '${sedString}' "${this.settings.quartzPath}/quartz.config.ts"`)
 
         // Execute the Quartz publish command
-        await this.exec(`npx quartz build --directory "${inputFolder}" --output "${outputFolder}"`, {
+        const published = await this.exec(`npx quartz build --directory "${inputFolder}" --output "${outputFolder}"`, {
           cwd: this.settings.quartzPath,
           shell: '/bin/bash',
           env: { PATH: this.settings.envPath }
@@ -74,6 +74,7 @@ export default class MyPlugin extends Plugin {
         }
 
         notice.hide()
+        new Notice(published ? 'Successfully published!' : 'Something went wrong :(')
       }
     })
   }
