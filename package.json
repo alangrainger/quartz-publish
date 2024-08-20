@@ -1,7 +1,7 @@
 {
-	"name": "quartz-custom-publish",
+	"name": "quartz-publish",
 	"version": "1.0.0",
-	"description": "",
+	"description": "Plugin to automatically build a static site from an Obsidian subfolder, using Quartz.",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
