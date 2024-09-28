@@ -24,14 +24,29 @@ export default class MyPlugin extends Plugin {
         const file = this.app.workspace.getActiveFile()
         if (!file) return
 
-        const metadata = this.app.metadataCache.getFileCache(file)?.frontmatter
-        const vaultFolder = file.parent?.path || ''
-        const inputFolder = this.app.vault.adapter.getFullPath(vaultFolder)
-        const outputFolder = metadata?.quartzPublishFolder.replace(/\/$/, '')
+        // Go up the file tree until we find an index.md with a `quartzPublishFolder` property
+        let vaultFolder = '', outputFolder, metadata
+        let parent = file.parent
+        while (parent && !outputFolder) {
+          // Look for an index.md file
+          const indexFile = this.app.vault.getAbstractFileByPath(parent.path + '/index.md')
+          if (indexFile instanceof TFile) {
+            // Check for a `quartzPublishFolder` property
+            metadata = this.app.metadataCache.getFileCache(indexFile)?.frontmatter
+            outputFolder = metadata?.quartzPublishFolder?.replace(/\/$/, '')
+          }
+          if (outputFolder) {
+            vaultFolder = parent.path
+            break
+          }
+          // Navigate up one level
+          parent = parent.parent
+        }
         if (!outputFolder) {
-          console.log(`This doesn't appear to be a Quartz publish root folder`)
+          new Notice(`Unable to find a Quartz publish root folder anywhere in the current note's path`)
           return
         }
+        const inputFolder = this.app.vault.adapter.getFullPath(vaultFolder)
 
         const notice = new Notice('Publishing folder...', 10000)
 
@@ -57,6 +72,9 @@ export default class MyPlugin extends Plugin {
             value.replace(/['"]/g, '\\x27')
           }",/`).join('; ')
         await this.exec(`sed -i '${sedString}' "${this.settings.quartzPath}/quartz.config.ts"`)
+
+        // Create the output folder in case it doesn't exist
+        await this.exec(`mkdir -p ${outputFolder}`)
 
         // Execute the Quartz publish command
         const published = await this.exec(`npx quartz build --directory "${inputFolder}" --output "${outputFolder}"`, {
