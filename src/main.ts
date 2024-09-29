@@ -61,7 +61,8 @@ export default class MyPlugin extends Plugin {
         // Modify Quartz config before publishing
         const replacements = {
           pageTitle: metadata?.quartzSiteTitle || '',
-          baseUrl: metadata?.quartzBaseUrl || ''
+          baseUrl: metadata?.quartzBaseUrl || '',
+          websiteId: metadata?.quartzTrackingId || '' // Analytics tracking ID
         }
         const sedString = Object.entries(replacements)
           // You'll notice the sed match is all characters until the end of the line.
